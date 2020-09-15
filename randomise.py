@@ -3,9 +3,13 @@ import json
 import hashlib
 import pathlib
 import random
+from tqdm import tqdm
+
 
 from PIL import Image
 
+import tensorflow.compat.v1 as tf
+from object_detection.utils import dataset_util, label_map_util
 
 def join_modules(modules):
     image = False
@@ -65,23 +69,56 @@ def pick_modules_from_data(jsonfile='data/modules_page_1.json', count=1):
     return result
 
 
-if __name__ == "__main__":
+def gen_tfrecord():
     modules = pick_modules_from_data(count=5)
     image, all_coords = join_modules([m["image"] for m in modules.values()])
-
-
+    
     hash = hashlib.sha256()
     for i in [m.encode('utf-8') for m in modules]:
         hash.update(bytes(i))
     h = hash.hexdigest()[:8]
-
     filename = f'modules_{h}.jpg'
     image.save(filename)
-    to_save = []
+
+    xmins, xmaxs = [], []
+    ymins, ymaxs = [], []
+    classes_text, classes = [], []
 
     for i, d in enumerate(modules.values()):
         data = {k: v for k, v in d.items() if k != 'image'}
-        data['x_min'], data['x_max'] = all_coords[i]
-        to_save.append(data)
-    with open(f'modules_{h}.json', 'w') as f:
-        json.dump(to_save, f, indent=2, sort_keys=True)
+        x_min, x_max = all_coords[i]
+
+        xmins.append(x_min)
+        xmaxs.append(x_max)
+        ymins.append(0)
+        ymaxs.append(image.height)
+        classes_text.append(data['name'].encode('utf-8'))
+        classes.append(int(data['id']))
+    
+    tf_example = tf.train.Example(features=tf.train.Features(feature={
+        'image/height': dataset_util.int64_feature(image.height),
+        'image/width': dataset_util.int64_feature(image.width),
+        'image/filename': dataset_util.bytes_feature(filename.encode('utf-8')),
+        'image/source_id': dataset_util.bytes_feature(filename.encode('utf-8')),
+        'image/encoded': dataset_util.bytes_feature(open(filename, "rb").read()),
+        'image/format': dataset_util.bytes_feature( b'jpg'),
+        'image/object/bbox/xmin': dataset_util.float_list_feature(xmins),
+        'image/object/bbox/xmax': dataset_util.float_list_feature(xmaxs),
+        'image/object/bbox/ymin': dataset_util.float_list_feature(ymins),
+        'image/object/bbox/ymax': dataset_util.float_list_feature(ymaxs),
+        'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
+        'image/object/class/label': dataset_util.int64_list_feature(classes),
+    }))
+
+    return tf_example
+
+
+if __name__ == "__main__":
+
+    filename = "train.tfrecords"
+    writer = tf.python_io.TFRecordWriter(filename)
+    for i in tqdm(range(10)):
+        tf_example = gen_tfrecord()
+        writer.write(tf_example.SerializeToString())
+    writer.close()
+    print(f'Successfully created the TFRecord file with {i+1} records: {filename}')

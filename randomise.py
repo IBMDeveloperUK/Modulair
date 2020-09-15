@@ -10,33 +10,30 @@ from PIL import Image
 def join_modules(modules):
     image = False
     all_coords = []
-    while len(modules):
-        if image:
-            image, coords = get_concat_h_resize(image, modules.pop())
-        else:
-            image, coords = get_concat_h_resize(modules.pop(), modules.pop())
-        all_coords.append(coords)
-    return image, all_coords
+    height = max([i.height for i in modules])
+    modules = [resize_image(i, height) for i in modules]
+    width = sum([i.width for i in modules])
+    return concat_images(height, width, modules)
 
+def resize_image(image, height):
+    if image.height == height:
+        return image
+    resample=Image.BICUBIC
+    return image.resize(
+        (int(image.width * height / image.height), height),
+        resample=resample
+    )
 
-def get_concat_h_resize(im1, im2, resample=Image.BICUBIC, resize_big_image=True):
+def concat_images(height, width, images):
     # Cribbed from https://note.nkmk.me/en/python-pillow-concat-images/
-    if im1.height == im2.height:
-        _im1 = im1
-        _im2 = im2
-    elif (((im1.height > im2.height) and resize_big_image) or
-          ((im1.height < im2.height) and not resize_big_image)):
-        _im1 = im1.resize(
-            (int(im1.width * im2.height / im1.height), im2.height), resample=resample)
-        _im2 = im2
-    else:
-        _im1 = im1
-        _im2 = im2.resize(
-            (int(im2.width * im1.height / im2.height), im1.height), resample=resample)
-    dst = Image.new('RGB', (_im1.width + _im2.width, _im1.height))
-    dst.paste(_im1, (0, 0))
-    dst.paste(_im2, (_im1.width, 0))
-    return dst, (dst.width, dst.height, _im1.width, _im2.width)
+    dst = Image.new('RGB', (width, height))
+    x = 0
+    coords = []
+    for image in images:
+        dst.paste(image, (x, 0))
+        coords.append((x, x + image.width))
+        x = x + image.width
+    return dst, coords
 
 
 def pick_modules_from_dir(data_dir='data', count=1):
@@ -71,30 +68,20 @@ def pick_modules_from_data(jsonfile='data/modules_page_1.json', count=1):
 if __name__ == "__main__":
     modules = pick_modules_from_data(count=5)
     image, all_coords = join_modules([m["image"] for m in modules.values()])
-    print(all_coords)
 
-    total_width = image.width
-    x_pos = 0
-    w_min = []
-    w_max = []
-    for tot_w, tot_h, im1_w, im2_w in reversed(all_coords):
-        print(total_width,  tot_w, tot_h, im1_w, im2_w)
-        w_min.append(x_pos)
-        w_min.append(im2_w)
-        w_max.append(im2_w)
-        w_max.append(tot_w)
-        x_pos = tot_w
-
-    print(w_min)
-    print(w_max)
 
     hash = hashlib.sha256()
     for i in [m.encode('utf-8') for m in modules]:
         hash.update(bytes(i))
     h = hash.hexdigest()[:8]
-    image.save(f'modules_{h}.jpg')
+
+    filename = f'modules_{h}.jpg'
+    image.save(filename)
     to_save = []
-    for d in modules.values():
-        to_save.append({k: v for k, v in d.items() if k != 'image'})
+
+    for i, d in enumerate(modules.values()):
+        data = {k: v for k, v in d.items() if k != 'image'}
+        data['x_min'], data['x_max'] = all_coords[i]
+        to_save.append(data)
     with open(f'modules_{h}.json', 'w') as f:
-        json.dump(to_save, f)
+        json.dump(to_save, f, indent=2, sort_keys=True)

@@ -72,12 +72,31 @@ if __name__ == "__main__":
     modules = pick_modules_from_data(count=5)
     image, all_coords = join_modules([m["image"] for m in modules.values()])
     print(all_coords)
+
     hash = hashlib.sha256()
     for i in [m.encode('utf-8') for m in modules]:
         hash.update(bytes(i))
     h = hash.hexdigest()[:8]
-    image.save(f'modules_{h}.jpg')
+
+    filename = f'modules_{h}.jpg'
+    image.save(filename)
     to_save = []
+
+    total_width = image.width
+    x_pos = 0
+    w_min = []
+    w_max = []
+    for tot_w, tot_h, im1_w, im2_w in all_coords:
+        print('positions', x_pos, im2_w + x_pos, tot_w - im1_w, tot_w)
+        w_min.append(x_pos)
+        w_max.append(im2_w + x_pos)
+        w_min.append(tot_w - im1_w)
+        w_max.append(tot_w)
+        x_pos = tot_w
+    print(filename)
+    print(w_min)
+    print(w_max)
+
     for d in modules.values():
         to_save.append({k: v for k, v in d.items() if k != 'image'})
     with open(f'modules_{h}.json', 'w') as f:

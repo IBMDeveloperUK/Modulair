@@ -72,6 +72,22 @@ if __name__ == "__main__":
     modules = pick_modules_from_data(count=5)
     image, all_coords = join_modules([m["image"] for m in modules.values()])
     print(all_coords)
+
+    total_width = image.width
+    x_pos = 0
+    w_min = []
+    w_max = []
+    for tot_w, tot_h, im1_w, im2_w in reversed(all_coords):
+        print(total_width,  tot_w, tot_h, im1_w, im2_w)
+        w_min.append(x_pos)
+        w_min.append(im2_w)
+        w_max.append(im2_w)
+        w_max.append(tot_w)
+        x_pos = tot_w
+
+    print(w_min)
+    print(w_max)
+
     hash = hashlib.sha256()
     for i in [m.encode('utf-8') for m in modules]:
         hash.update(bytes(i))

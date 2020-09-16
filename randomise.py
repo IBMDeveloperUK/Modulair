@@ -40,14 +40,14 @@ def concat_images(height, width, images):
     return dst, coords
 
 
-def pick_modules_from_dir(data_dir='data', count=1):
+def pick_modules_from_dir(data_dir='modules', count=1):
     data = list(pathlib.Path(data_dir).glob('./*.jpg'))
     result = []
-    i = 0
-    while i < count:
+
+    for _ in range(count):
         p = random.choice(data)
         result.append(Image.open(p.as_posix()))
-        i += 1
+
     return result
 
 
@@ -62,7 +62,7 @@ def pick_modules_from_data(jsonfile='data/modules_page_1.json', count=1):
         if p["id"] not in result:
             if '1u' not in p["name"].lower():
                 result[p["id"]] = p
-                image = pathlib.Path(f'data/{p["image"].split("/")[-1]}')
+                image = pathlib.Path(f'modules/{p["image"].split("/")[-1]}')
                 if image.exists():
                     result[p["id"]]["image"] = Image.open(image.as_posix())
                     i += 1
@@ -70,14 +70,16 @@ def pick_modules_from_data(jsonfile='data/modules_page_1.json', count=1):
 
 
 def gen_tfrecord():
-    modules = pick_modules_from_data(count=5)
+    page = random.randint(1, 5)
+    jsonfile=f'modules/modules_page_{page}.json'
+    modules = pick_modules_from_data(count=5, jsonfile=jsonfile)
     image, all_coords = join_modules([m["image"] for m in modules.values()])
     
     hash = hashlib.sha256()
     for i in [m.encode('utf-8') for m in modules]:
         hash.update(bytes(i))
     h = hash.hexdigest()[:8]
-    filename = f'modules_{h}.jpg'
+    filename = f'composites/modules_{h}.jpg'
     image.save(filename)
 
     xmins, xmaxs = [], []
@@ -117,7 +119,8 @@ if __name__ == "__main__":
 
     filename = "train.tfrecords"
     writer = tf.python_io.TFRecordWriter(filename)
-    for i in tqdm(range(10)):
+    
+    for i in tqdm(range(1000)):
         tf_example = gen_tfrecord()
         writer.write(tf_example.SerializeToString())
     writer.close()

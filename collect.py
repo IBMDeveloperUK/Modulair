@@ -63,7 +63,7 @@ def save_images(data):
         print(module["id"], module["image"])
         r = requests.get(module["image"], stream=True)
         r.raise_for_status()
-        with open(module["image"].split('/')[-1], 'wb') as f:
+        with open("modules/" + module["image"].split('/')[-1], 'wb') as f:
             for chunk in r:
                 f.write(chunk)
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         try:
             results = get_search(next)
             data = parse_results(results)
-            with open(f'modules_page_{next}.json', 'w') as f:
+            with open(f'modules/modules_page_{next}.json', 'w') as f:
                 json.dump(data, f)
             save_images(data)
             time.sleep(2)

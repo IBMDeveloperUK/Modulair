@@ -115,13 +115,20 @@ def gen_tfrecord():
     return tf_example
 
 
-if __name__ == "__main__":
+def write_records(filename, num):
 
-    filename = "train.tfrecords"
     writer = tf.python_io.TFRecordWriter(filename)
     
-    for i in tqdm(range(1000)):
+    for i in tqdm(range(num)):
         tf_example = gen_tfrecord()
         writer.write(tf_example.SerializeToString())
     writer.close()
-    print(f'Successfully created the TFRecord file with {i+1} records: {filename}')
+    
+    print(f'Successfully created the TFRecord file with {num} records: {filename}')
+
+
+if __name__ == "__main__":
+
+    write_records("train.record", 1000)
+    write_records("test.record", 100)
+    
